@@ -1,5 +1,8 @@
+import { existsSync, readFileSync } from "node:fs";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
-import { buildAdobeCredentials, loadConfig } from "./config.ts";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { buildAdobeCredentials, loadConfig, maskSecret, persistCredentialsToEnv } from "./config.ts";
 import {
   handleImageGeneration,
   handleImageUpscale,
@@ -7,6 +10,9 @@ import {
   handleUsage,
   handleVideoGeneration,
 } from "./handlers/mediaHandlers.ts";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const UI_HTML_PATH = resolve(__dirname, "../public/index.html");
 
 const config = loadConfig();
 process.env.DATA_DIR = config.dataDir;
@@ -111,6 +117,14 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   const path = url.pathname.replace(/\/+$/, "") || "/";
 
+  if ((req.method === "GET" || req.method === "HEAD") && (path === "/" || path === "/ui")) {
+    if (existsSync(UI_HTML_PATH)) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(req.method === "HEAD" ? undefined : readFileSync(UI_HTML_PATH, "utf8"));
+      return;
+    }
+  }
+
   if (req.method === "GET" && path === "/health") {
     sendJson(res, 200, {
       status: "healthy",
@@ -140,13 +154,39 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && path === "/v1/credentials/status") {
+      sendJson(res, 200, {
+        has_token: Boolean(config.adobeToken),
+        token_preview: maskSecret(config.adobeToken),
+        has_cookie: Boolean(config.adobeCookie),
+        cookie_preview: maskSecret(config.adobeCookie),
+        api_key_required: Boolean(config.apiKey),
+      });
+      return;
+    }
+
     if (req.method === "POST" && path === "/v1/credentials") {
       const body = await parseRequestBody(req);
-      if (typeof body.token === "string") config.adobeToken = body.token.trim();
-      if (typeof body.cookie === "string") config.adobeCookie = body.cookie.trim();
+      const persist = body.persist === true;
+      const updates: { token?: string; cookie?: string } = {};
+      if (typeof body.token === "string") {
+        config.adobeToken = body.token.trim();
+        updates.token = config.adobeToken;
+      }
+      if (typeof body.cookie === "string") {
+        config.adobeCookie = body.cookie.trim();
+        updates.cookie = config.adobeCookie;
+      }
+      if (persist && (updates.token !== undefined || updates.cookie !== undefined)) {
+        persistCredentialsToEnv(updates);
+      }
       sendJson(res, 200, {
         ok: true,
-        credentials_configured: Boolean(config.adobeToken || config.adobeCookie),
+        persisted: persist,
+        has_token: Boolean(config.adobeToken),
+        token_preview: maskSecret(config.adobeToken),
+        has_cookie: Boolean(config.adobeCookie),
+        cookie_preview: maskSecret(config.adobeCookie),
       });
       return;
     }

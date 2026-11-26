@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export interface AdobeCredentialsInput {
@@ -49,6 +49,44 @@ export function loadConfig(): AppConfig {
     adobeCookie: (process.env.ADOBE_FIREFLY_COOKIE || "").trim(),
     dataDir: process.env.DATA_DIR || resolve(process.cwd(), ".data"),
   };
+}
+
+export function maskSecret(value: string): string {
+  const s = value.trim();
+  if (!s) return "";
+  if (s.length <= 14) return `${s.slice(0, 3)}…${s.slice(-3)}`;
+  return `${s.slice(0, 8)}…${s.slice(-6)}`;
+}
+
+export function persistCredentialsToEnv(
+  updates: { token?: string; cookie?: string },
+  envPath = resolve(process.cwd(), ".env")
+): void {
+  const lines = existsSync(envPath) ? readFileSync(envPath, "utf8").split(/\r?\n/) : [];
+  const entries = new Map<string, string>();
+  if (updates.token !== undefined) entries.set("ADOBE_FIREFLY_TOKEN", updates.token);
+  if (updates.cookie !== undefined) entries.set("ADOBE_FIREFLY_COOKIE", updates.cookie);
+
+  const seen = new Set<string>();
+  const nextLines = lines.map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) return line;
+    const eq = line.indexOf("=");
+    if (eq <= 0) return line;
+    const key = line.slice(0, eq).trim();
+    if (entries.has(key)) {
+      seen.add(key);
+      return `${key}=${entries.get(key)}`;
+    }
+    return line;
+  });
+
+  for (const [key, val] of entries.entries()) {
+    if (!seen.has(key)) {
+      nextLines.push(`${key}=${val}`);
+    }
+  }
+  writeFileSync(envPath, nextLines.join("\n").replace(/\n+$/, "\n"), { encoding: "utf8", mode: 0o600 });
 }
 
 export function buildAdobeCredentials(
