@@ -1,0 +1,21 @@
+{
+  "name": "firefly-api",
+  "version": "1.0.0",
+  "description": "Lightweight standalone Adobe Firefly reverse-proxy API (extracted from OmniRoute under MIT License)",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}
