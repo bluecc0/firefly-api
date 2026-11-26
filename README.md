@@ -3,6 +3,7 @@
 轻量级独立 **Adobe Firefly** 反向代理 API 服务，基于 [OmniRoute](https://github.com/cheaper-inference/OmniRoute) 的 Adobe Firefly 核心模块按 MIT 协议抽离二开，零冗余框架依赖。
 
 ## 功能特性
+- **内置零依赖 Web UI**：启动后直接访问 `http://127.0.0.1:3080`，支持网页端填写/持久化凭证、查看实时点数余额、在线文生图/图生图/视频生成/超分放大
 - **文生图**：`POST /v1/images/generations`（Flux 2、Nano Banana / Gemini 3.1、GPT Image 2、Seedream 5.0、Runway Gen-4 等 17 个模型）
 - **图生图 / 编辑**：`POST /v1/images/edits`（支持 `multipart/form-data` 和 JSON `image_url` / base64）
 - **图片超分放大**：`POST /v1/images/upscale`（Topaz Standard / Topaz Bloom）
